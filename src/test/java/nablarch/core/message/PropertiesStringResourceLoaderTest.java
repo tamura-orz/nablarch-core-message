@@ -1,13 +1,10 @@
 package nablarch.core.message;
 
-import mockit.Deencapsulation;
-import mockit.Mocked;
-import mockit.NonStrictExpectations;
-import nablarch.core.util.FileUtil;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.beans.HasPropertyWithValue.hasProperty;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -18,9 +15,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.hamcrest.CoreMatchers.nullValue;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertThat;
+import nablarch.core.util.FileUtil;
+
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
+import mockit.Deencapsulation;
+import mockit.Expectations;
+import mockit.Mocked;
 
 /**
  * {@link PropertiesStringResourceLoader}のテストクラス。
@@ -96,17 +100,18 @@ public class PropertiesStringResourceLoaderTest {
      *
      * @throws Exception
      */
-     @Test
+    @Test
     public void testGetValue_exist() throws Exception {
-         Map<String, Map<String, String>> messages = Deencapsulation.getField(sut, "messages");
-         Map<String, String> value = new HashMap<String, String>();
-         value.put(Locale.getDefault().getLanguage(),"existedValue");
-         messages.put("existed.key", value);
-         StringResource result = sut.getValue("existed.key");
+        Map<String, Map<String, String>> messages = Deencapsulation.getField(sut, "messages");
+        Map<String, String> value = new HashMap<String, String>();
+        value.put(Locale.getDefault()
+                        .getLanguage(), "existedValue");
+        messages.put("existed.key", value);
+        StringResource result = sut.getValue("existed.key");
 
-         assertThat(result.getId(), is("existed.key"));
-         assertThat(result.getValue(Locale.getDefault()), is("existedValue"));
-     }
+        assertThat(result.getId(), is("existed.key"));
+        assertThat(result.getValue(Locale.getDefault()), is("existedValue"));
+    }
 
     /**
      * {@link PropertiesStringResourceLoader#getValue(Object)}のテスト。
@@ -145,8 +150,10 @@ public class PropertiesStringResourceLoaderTest {
         expectedException.expect(IllegalArgumentException.class);
         expectedException.expectMessage("failed to load the file. file path = [classpath:messages.properties]");
 
-        new NonStrictExpectations() {{
-            properties.load(withAny(new InputStreamReader(FileUtil.getResource("classpath:messages.properties"), "UTF-8")));
+        new Expectations() {{
+            properties.load(
+                    withAny(new InputStreamReader(FileUtil.getResource("classpath:messages.properties"), "UTF-8")));
+            minTimes = 0;
             result = new IOException();
         }};
 
@@ -162,11 +169,14 @@ public class PropertiesStringResourceLoaderTest {
     public void testLoadAll_default() throws Exception {
         List<StringResource> result = sut.loadAll();
 
-        assertThat(result.size(), is(2));
-        assertThat(result.get(0).getId(), is("default.key"));
-        assertThat(result.get(0).getValue(Locale.getDefault()), is("デフォルト"));
-        assertThat(result.get(1).getId(), is("load.all.key"));
-        assertThat(result.get(1).getValue(Locale.getDefault()), is("loadAllValue"));
+        assertThat(result.size(), is(4));
+
+        assertThat(result, containsInAnyOrder(
+                hasProperty("id", is("default.key")),
+                hasProperty("id", is("load.all.key")),
+                hasProperty("id", is("message.with.placeholder")),
+                hasProperty("id", is("message"))
+        ));
     }
 
     /**
@@ -182,9 +192,12 @@ public class PropertiesStringResourceLoaderTest {
         Map<String, String> value1 = new HashMap<String, String>();
         Map<String, String> value2 = new HashMap<String, String>();
         Map<String, String> value3 = new HashMap<String, String>();
-        value1.put(Locale.getDefault().getLanguage(),"existed1Value");
-        value2.put(Locale.getDefault().getLanguage(),"existed2Value");
-        value3.put(Locale.getDefault().getLanguage(),"existed3Value");
+        value1.put(Locale.getDefault()
+                         .getLanguage(), "existed1Value");
+        value2.put(Locale.getDefault()
+                         .getLanguage(), "existed2Value");
+        value3.put(Locale.getDefault()
+                         .getLanguage(), "existed3Value");
         messages.put("existed1.key", value1);
         messages.put("existed2.key", value2);
         messages.put("existed3.key", value3);
@@ -222,8 +235,9 @@ public class PropertiesStringResourceLoaderTest {
     @Test
     public void testGetId() throws Exception {
         Map<String, String> map = new HashMap<String, String>();
-        map.put(Locale.getDefault().getLanguage(), "testValue");
-        assertThat(sut.getId(new BasicStringResource("test.key", map)), is((Object)"test.key"));
+        map.put(Locale.getDefault()
+                      .getLanguage(), "testValue");
+        assertThat(sut.getId(new BasicStringResource("test.key", map)), is((Object) "test.key"));
     }
 
     /**
@@ -234,7 +248,7 @@ public class PropertiesStringResourceLoaderTest {
     @Test
     public void testGenerateIndexKey() throws Exception {
         Map<String, String> map = new HashMap<String, String>();
-        StringResource result = new BasicStringResource("test.key",map );
+        StringResource result = new BasicStringResource("test.key", map);
         assertThat(sut.generateIndexKey("indexName", result), is(nullValue()));
     }
 

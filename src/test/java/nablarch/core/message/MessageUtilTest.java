@@ -1,76 +1,45 @@
 package nablarch.core.message;
 
-import nablarch.core.ThreadContext;
-import nablarch.core.cache.BasicStaticDataCache;
-import nablarch.core.db.transaction.SimpleDbTransactionManager;
-import nablarch.core.repository.SystemRepository;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import nablarch.test.support.SystemRepositoryResource;
-import nablarch.test.support.db.helper.DatabaseTestRunner;
-import nablarch.test.support.db.helper.VariousDbTestHelper;
+import static org.hamcrest.CoreMatchers.*;
+import static org.junit.Assert.assertThat;
 
 import java.util.Locale;
 
-import static org.junit.Assert.assertEquals;
+import nablarch.core.ThreadContext;
+import nablarch.core.repository.SystemRepository;
+import nablarch.test.support.SystemRepositoryResource;
 
-@RunWith(DatabaseTestRunner.class)
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
 public class MessageUtilTest {
 
     @Rule
     public SystemRepositoryResource repositoryResource = new SystemRepositoryResource(
-            "nablarch/core/message/message-resource-initialload-test.xml");
-
-    @BeforeClass
-    public static void classSetup() throws Exception {
-        VariousDbTestHelper.createTable(TestMessage2.class);
-    }
+            "nablarch/core/message/message-resource.xml");
+    
+    @Rule
+    public ExpectedException expectedException = ExpectedException.none();
 
     @Test
     public void testGetMessageObject() throws Exception {
 
-        VariousDbTestHelper.setUpTable(
-                new TestMessage2("10001", "ja","メッセージ001"),
-                new TestMessage2("10001", "en","Message001"),
-                new TestMessage2("10002", "ja","メッセージ002"),
-               new TestMessage2("10002", "en","Message002")
-        );
-
-        BasicStringResourceLoader stringResourceLoader = repositoryResource.getComponentByType(BasicStringResourceLoader.class);
-        stringResourceLoader.setDbManager( (SimpleDbTransactionManager) repositoryResource.getComponent("dbManager"));
-        BasicStaticDataCache<StringResource> cache = (BasicStaticDataCache<StringResource>) SystemRepository.getObject("stringResourceCache");
-        cache.initialize();
-
-        StringResource messageObject = MessageUtil.getStringResource("10001");
-        assertEquals("10001", messageObject.getId());
-        assertEquals("メッセージ001", messageObject.getValue(Locale.JAPANESE));
+        StringResource messageObject = MessageUtil.getStringResource("default.key");
+        assertThat(messageObject.getId(), is("default.key"));
+        assertThat(messageObject.getValue(Locale.JAPANESE), is("デフォルト"));
+        assertThat(messageObject.getValue(Locale.ENGLISH), is("default key"));
     }
 
     @Test
     public void testCreateResultMessage() throws Exception {
 
-        VariousDbTestHelper.setUpTable(
-                new TestMessage2("10001", "ja","メッセージ001"),
-                new TestMessage2("10001", "en","Message001"),
-                new TestMessage2("10002", "ja","メッセージ002"),
-                new TestMessage2("10002", "en","Message002"),
-                new TestMessage2("10003", "ja","メッセージ003"),
-               new TestMessage2("10003", "en","Message003")
-        );
+        Message message = MessageUtil.createMessage(MessageLevel.INFO, "message.with.placeholder",
+                MessageUtil.createMessage(MessageLevel.INFO, "message"), "test2");
 
-        BasicStringResourceLoader stringResourceLoader = repositoryResource.getComponentByType(BasicStringResourceLoader.class);
-        stringResourceLoader.setDbManager( (SimpleDbTransactionManager) repositoryResource.getComponent("dbManager"));
-        BasicStaticDataCache<StringResource> cache = (BasicStaticDataCache<StringResource>) SystemRepository.getObject("stringResourceCache");
-        cache.initialize();
-
-        Message message3 = MessageUtil.createMessage(MessageLevel.INFO, "10003");
-        Message message2 = MessageUtil.createMessage(MessageLevel.INFO, "10002", message3, "test2");
-
-        assertEquals(MessageLevel.INFO, message2.getLevel());
-        assertEquals("10002", message2.getMessageId());
-        assertEquals("メッセージ002", message2.formatMessage(Locale.JAPANESE));
+        assertThat(message.getLevel(), is(MessageLevel.INFO));
+        assertThat(message.getMessageId(), is("message.with.placeholder"));
+        assertThat(message.formatMessage(Locale.JAPANESE), is("ここにmessageのメッセージが入る→埋め込みメッセージ-test2"));
     }
 
     /**
@@ -80,28 +49,17 @@ public class MessageUtilTest {
     @Test
     public void testDefaultLocale() throws Exception {
 
-        VariousDbTestHelper.setUpTable(
-                new TestMessage2("10001", "ja","メッセージ001"),
-                new TestMessage2("10001", "en","Message001"),
-                new TestMessage2("10002", "ja","メッセージ002"),
-                new TestMessage2("10002", "en","Message002"),
-                new TestMessage2("10003", "ja","メッセージ003"),
-                new TestMessage2("10003", "en","Message003")
-        );
-
-        BasicStringResourceLoader stringResourceLoader = repositoryResource.getComponentByType(BasicStringResourceLoader.class);
-        stringResourceLoader.setDbManager( (SimpleDbTransactionManager) repositoryResource.getComponent("dbManager"));
-        BasicStaticDataCache<StringResource> cache = (BasicStaticDataCache<StringResource>) SystemRepository.getObject("stringResourceCache");
-        cache.initialize();
-
-        Message message3 = MessageUtil.createMessage(MessageLevel.INFO, "10003");
-        Message message2 = MessageUtil.createMessage(MessageLevel.INFO, "10002", message3, "test2");
+        Message message = MessageUtil.createMessage(
+                MessageLevel.INFO,
+                "message.with.placeholder",
+                MessageUtil.createMessage(MessageLevel.INFO, "message"),
+                "test2");
 
         ThreadContext.setLanguage(null);
 
-        assertEquals(MessageLevel.INFO, message2.getLevel());
-        assertEquals("10002", message2.getMessageId());
-        assertEquals("メッセージ002", message2.formatMessage());
+        assertThat(message.getLevel(), is(MessageLevel.INFO));
+        assertThat(message.getMessageId(), is("message.with.placeholder"));
+        assertThat(message.formatMessage(), is("ここにmessageのメッセージが入る→埋め込みメッセージ-test2"));
     }
 
     @Test
@@ -110,14 +68,21 @@ public class MessageUtilTest {
 
         Message message = MessageUtil.createMessage(MessageLevel.INFO, "default.key");
 
-        assertEquals(MessageLevel.INFO, message.getLevel());
-        assertEquals("default.key", message.getMessageId());
-        assertEquals("デフォルト", message.formatMessage());
+        assertThat(message.getLevel(), is(MessageLevel.INFO));
+        assertThat(message.getMessageId(), is("default.key"));
+        assertThat(message.formatMessage(), is("デフォルト"));
 
         message = MessageUtil.createMessage(MessageLevel.INFO, "load.all.key");
 
-        assertEquals(MessageLevel.INFO, message.getLevel());
-        assertEquals("load.all.key", message.getMessageId());
-        assertEquals("loadAllValue", message.formatMessage());
+        assertThat(message.getLevel(), is(MessageLevel.INFO));
+        assertThat(message.getMessageId(), is("load.all.key"));
+        assertThat(message.formatMessage(), is("loadAllValue"));
+    }
+
+    @Test
+    public void messageNotFound() throws Exception {
+        expectedException.expect(MessageNotFoundException.class);
+        expectedException.expectMessage("message was not found. message id = notFound");
+        MessageUtil.getStringResource("notFound");
     }
 }
